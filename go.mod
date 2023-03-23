@@ -2,7 +2,10 @@ module github.com/butcher-of-blaviken/ethvanity
 
 go 1.20
 
-require github.com/ethereum/go-ethereum v1.11.5
+require (
+	github.com/ethereum/go-ethereum v1.11.5
+	golang.org/x/term v0.1.0
+)
 
 require (
 	github.com/btcsuite/btcd/btcec/v2 v2.2.0 // indirect
