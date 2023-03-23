@@ -4,12 +4,14 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
 	"runtime"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+	"golang.org/x/term"
 )
 
 var (
@@ -17,7 +19,8 @@ var (
 	numWorkers      = flag.Int("num-workers", runtime.NumCPU(), "number of workers to use. for generate only.")
 	desiredPattern  = flag.String("desired-pattern", "", "desired prefix or suffix pattern.  for generate only.")
 	patternPosition = flag.String("pattern-position", "prefix", "whether the pattern should be prefix or suffix.  for generate only.")
-	privHex         = flag.String("priv-hex", "", "private key in hex, to verify the output address")
+	outFile         = flag.String("o", "out.txt", "output file to store info in")
+	verbose         = flag.Bool("verbose", false, "whether to log progress or not")
 )
 
 func main() {
@@ -30,10 +33,22 @@ func main() {
 			go producer(out, done)
 		}
 		o := consumer(out, done, *desiredPattern, *patternPosition)
-		fmt.Println("address:", o.address.Hex())
-		fmt.Println("private key:", hexutil.Encode(o.priv))
+		f, err := os.Create(*outFile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer f.Close()
+		f.WriteString(fmt.Sprintf("address: %s\n", o.address.Hex()))
+		f.WriteString(fmt.Sprintf("private key hex: %s\n", hexutil.Encode(o.priv)))
+		f.Sync()
 	case "verify":
-		privKey, err := crypto.HexToECDSA(*privHex)
+		fmt.Print("Enter private key hex (without 0x): ")
+		hexBytes, err := term.ReadPassword(0)
+		fmt.Println()
+		if err != nil {
+			log.Fatal(err)
+		}
+		privKey, err := crypto.HexToECDSA(string(hexBytes))
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -68,7 +83,7 @@ func consumer(o chan out, done chan struct{}, desiredPattern, patternPosition st
 			if isValidVanityAddress(data.address, desiredPattern, patternPosition) {
 				return data
 			}
-			if step%10000 == 0 {
+			if *verbose && step%10000 == 0 {
 				fmt.Println("step:", step, "latest addr:", data.address.Hex())
 			}
 			step++
